@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Welding Coach — Live Demo</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#0f1117;color:#e0e0e0;padding:20px}
+h1{font-size:18px;font-weight:500;color:#fff;margin-bottom:4px}
+.subtitle{font-size:13px;color:#888;margin-bottom:20px}
+.controls{display:flex;gap:10px;margin-bottom:20px;align-items:center;flex-wrap:wrap}
+button{padding:8px 18px;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500}
+.btn-expert{background:#1d9e75;color:#fff}
+.btn-beginner{background:#d85a30;color:#fff}
+.btn-play{background:#378add;color:#fff}
+select{background:#1e2130;color:#e0e0e0;border:1px solid #333;padding:6px 10px;border-radius:6px;font-size:13px}
+.speed-label{font-size:12px;color:#888}
+.seed-label{font-size:11px;color:#555;margin-left:4px}
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.metric{background:#1a1d2e;border-radius:8px;padding:12px 14px;border:1px solid #252840;transition:all .25s}
+.metric-label{font-size:11px;color:#666;margin-bottom:4px}
+.metric-value{font-size:22px;font-weight:600;color:#e0e0e0;transition:color .25s}
+.metric-unit{font-size:11px;color:#555;margin-left:2px}
+.metric.good{border-color:#1d9e75}.metric.good .metric-value{color:#1d9e75}
+.metric.warn{border-color:#ef9f27}.metric.warn .metric-value{color:#ef9f27}
+.metric.error{border-color:#e24b4a;background:#1f1010}.metric.error .metric-value{color:#e24b4a}
+.metric.neutral .metric-value{color:#e0e0e0}
+.metric.primary-err{border-color:#e24b4a;border-width:2px;background:#1f1010}.metric.primary-err .metric-value{color:#e24b4a}
+.metric.primary-warn{border-color:#ef9f27;border-width:2px;background:#1f1a08}.metric.primary-warn .metric-value{color:#ef9f27}
+.metric.secondary-err{border-color:#e24b4a;border-width:2px}.metric.secondary-err .metric-value{color:#e24b4a}
+.metric.secondary-warn{border-color:#ef9f27;border-width:2px}.metric.secondary-warn .metric-value{color:#ef9f27}
+.coach-box{border-radius:10px;padding:14px 16px;border:1px solid #252840;margin-bottom:16px;transition:all .25s;background:#1a1d2e}
+.coach-box.ok{border-color:#1d9e75}
+.coach-box.has-errors{border-color:#e24b4a}
+.coach-box.has-warns{border-color:#ef9f27;background:#1a1a10}
+.coach-header{display:flex;align-items:center;gap:10px}
+.coach-icon{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.coach-icon.ok{background:#0f3d2a}
+.coach-icon.err{background:#3d1a0f}
+.coach-icon.warn{background:#3d2d00}
+.coach-title{font-size:14px;font-weight:500;flex:1}
+.coach-title.ok{color:#1d9e75}
+.coach-title.err{color:#f09595}
+.coach-title.warn{color:#ef9f27}
+.issue-badge{font-size:11px;padding:2px 8px;border-radius:10px;font-weight:500}
+.issue-badge.err{background:#3d1a0f;color:#f09595}
+.issue-badge.warn{background:#3d2d00;color:#ef9f27}
+.issue-badge.ok{background:#0f3d2a;color:#1d9e75}
+.issue-list{margin-top:10px;display:flex;flex-direction:column;gap:5px}
+.issue-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;font-size:12px}
+.issue-item.err{background:#2a1010;color:#f09595}
+.issue-item.warn{background:#1f1a0a;color:#ef9f27}
+.issue-rank{font-size:10px;font-weight:600;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.issue-rank.err{background:#e24b4a;color:#fff}
+.issue-rank.warn{background:#ef9f27;color:#000}
+.issue-metric{font-weight:600;min-width:90px;font-size:11px}
+.issue-msg{opacity:.9}
+.score-bar-wrap{margin-top:8px}
+.score-bar-bg{background:#252840;border-radius:4px;height:6px;width:100%}
+.score-bar{height:6px;border-radius:4px;transition:width .3s,background .3s;background:#1d9e75}
+.score-bar.warn{background:#ef9f27}
+.score-bar.bad{background:#e24b4a}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:12px}
+.card{background:#1a1d2e;border-radius:10px;padding:16px;border:1px solid #252840}
+.card-title{font-size:11px;color:#888;margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em}
+.legend{display:flex;gap:14px;margin-top:6px;flex-wrap:wrap}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:11px;color:#666}
+.legend-dot{width:16px;height:2px;border-radius:1px}
+.timeline{font-size:12px;color:#555;margin-top:6px}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500;margin-left:8px}
+.badge.ok{background:#0f3d2a;color:#1d9e75}
+.badge.err{background:#3d1a0f;color:#f09595}
+</style>
+</head>
+<body>
+<h1>AI Welding Coach <span class="badge ok" id="session-badge">—</span></h1>
+<p class="subtitle">Real-time adaptive guidance engine — Skillveri simulator</p>
+
+<div class="controls">
+  <button class="btn-expert"   onclick="startSession('expert')">Expert session</button>
+  <button class="btn-beginner" onclick="startSession('beginner')">Beginner session</button>
+  <button class="btn-play" id="playbtn" onclick="togglePlay()" disabled>Play</button>
+  <span class="speed-label">Speed:</span>
+  <select id="speed" onchange="setSpeed(this.value)">
+    <option value="1">1x</option>
+    <option value="3" selected>3x</option>
+    <option value="10">10x</option>
+  </select>
+  <span class="seed-label" id="seed-label"></span>
+</div>
+
+<div class="metrics">
+  <div class="metric neutral" id="m-angle">
+    <div class="metric-label">Work angle <span style="color:#444;font-size:10px">ideal 85–95°</span></div>
+    <div class="metric-value" id="v-angle">—<span class="metric-unit">°</span></div>
+  </div>
+  <div class="metric neutral" id="m-speed">
+    <div class="metric-label">Travel speed <span style="color:#444;font-size:10px">ideal 5–12 mm/s</span></div>
+    <div class="metric-value" id="v-speed">—<span class="metric-unit">mm/s</span></div>
+  </div>
+  <div class="metric neutral" id="m-arc">
+    <div class="metric-label">Arc length <span style="color:#444;font-size:10px">ideal 4–8 mm</span></div>
+    <div class="metric-value" id="v-arc">—<span class="metric-unit">mm</span></div>
+  </div>
+  <div class="metric neutral" id="m-tremor">
+    <div class="metric-label">Torch tremor <span style="color:#444;font-size:10px">ideal &lt;0.06</span></div>
+    <div class="metric-value" id="v-tremor">—</div>
+  </div>
+  <div class="metric neutral" id="m-voltage">
+    <div class="metric-label">Voltage (sim) <span style="color:#444;font-size:10px">ideal 20–24 V</span></div>
+    <div class="metric-value" id="v-voltage">—<span class="metric-unit">V</span></div>
+  </div>
+  <div class="metric neutral" id="m-score">
+    <div class="metric-label">Session score</div>
+    <div class="metric-value" id="v-score">—<span class="metric-unit">%</span></div>
+    <div class="score-bar-wrap">
+      <div class="score-bar-bg"><div class="score-bar" id="score-bar" style="width:0%"></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="coach-box ok" id="coach-box">
+  <div class="coach-header">
+    <div class="coach-icon ok" id="coach-icon">✓</div>
+    <div class="coach-title ok" id="coach-title">Click Expert or Beginner to generate a fresh session</div>
+    <div class="issue-badge ok" id="issue-badge"></div>
+  </div>
+  <div class="issue-list" id="issue-list"></div>
+</div>
+
+<div class="grid">
+  <div class="card"><div class="card-title">Work angle (°)</div><canvas id="chartAngle" height="130"></canvas></div>
+  <div class="card"><div class="card-title">Travel speed (mm/s)</div><canvas id="chartSpeed" height="130"></canvas></div>
+  <div class="card"><div class="card-title">Arc length (mm)</div><canvas id="chartArc" height="130"></canvas></div>
+  <div class="card"><div class="card-title">Error probability</div><canvas id="chartError" height="130"></canvas></div>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#1d9e75"></div>Within ideal</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#ef9f27"></div>Outside ideal</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#e24b4a"></div>Hard limit breach</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#378add"></div>Live signal</div>
+</div>
+<div class="timeline" id="timeline">Generate a session to begin</div>
+
+<script>
+// ── Seeded RNG (Mulberry32) — reproducible per session seed ──────────────────
+function makeRng(seed){
+  return function(){
+    seed|=0; seed=seed+0x6D2B79F5|0;
+    let t=Math.imul(seed^seed>>>15,1|seed);
+    t=t+Math.imul(t^t>>>7,61|t)^t;
+    return ((t^t>>>14)>>>0)/4294967296;
+  };
+}
+
+// ── Gaussian from rng ─────────────────────────────────────────────────────────
+function randn(rng,mean,std){
+  let u=0,v=0;
+  while(!u)u=rng(); while(!v)v=rng();
+  return mean+std*Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
+}
+
+// ── Data generator (runs in browser) ─────────────────────────────────────────
+function generateSession(skill, durationS=20, hz=100){
+  const seed=Math.floor(Math.random()*1e8);
+  const rng=makeRng(seed);
+  const n=durationS*hz;
+  const frames=[];
+
+  // Expert baselines
+  const cfg = skill==='expert' ? {
+    angle_mu:90,angle_sd:1.5, speed_mu:8,speed_sd:0.4,
+    arc_mu:6,arc_sd:0.5, tremor_sd:0.02, volt_mu:22,volt_sd:0.3,
+    curr_mu:180,curr_sd:2, wfs_mu:5,wfs_sd:0.1, errors:0
+  } : {
+    angle_mu:90,angle_sd:5, speed_mu:8,speed_sd:1.8,
+    arc_mu:6,arc_sd:1.8, tremor_sd:0.10, volt_mu:22,volt_sd:1.2,
+    curr_mu:180,curr_sd:12, wfs_mu:5,wfs_sd:0.6, errors:4
+  };
+
+  // Pre-generate error windows for beginner
+  const errorWindows=[];
+  for(let e=0;e<cfg.errors;e++){
+    const start=Math.floor(rng()*(n-hz*5)+hz*2);
+    const len  =Math.floor(rng()*hz*4+hz*2);
+    const type =['angle','speed','arc','tremor','voltage'][Math.floor(rng()*5)];
+    errorWindows.push({start, end:Math.min(start+len,n), type});
+  }
+
+  for(let i=0;i<n;i++){
+    const t=i/hz;
+    let work_angle   =randn(rng,cfg.angle_mu,cfg.angle_sd);
+    let travel_speed =randn(rng,cfg.speed_mu,cfg.speed_sd);
+    let arc_length   =randn(rng,cfg.arc_mu,cfg.arc_sd);
+    let tremor       =Math.abs(randn(rng,0,cfg.tremor_sd));
+    let voltage      =randn(rng,cfg.volt_mu,cfg.volt_sd);
+    let gt_error     =0;
+
+    // Apply error windows
+    for(const w of errorWindows){
+      if(i>=w.start && i<w.end){
+        gt_error=1;
+        if(w.type==='angle')   work_angle  +=(rng()>0.5?1:-1)*randn(rng,20,5);
+        if(w.type==='speed')   travel_speed+=(rng()>0.5?1:-1)*randn(rng,7,2);
+        if(w.type==='arc')     arc_length  +=randn(rng,6,2);
+        if(w.type==='tremor')  tremor      +=randn(rng,0.15,0.05);
+        if(w.type==='voltage') voltage     +=(rng()>0.5?1:-1)*randn(rng,4,1);
+      }
+    }
+
+    // Hard limit check → is_error
+    const HARD={work_angle:[70,110],travel_speed:[2,15],arc_length:[3,10],tremor:[0,0.10],voltage:[19,25]};
+    const vals={work_angle,travel_speed,arc_length,tremor,voltage};
+    const hard_breach=Object.entries(HARD).some(([k,[lo,hi]])=>vals[k]<lo||vals[k]>hi);
+    const is_error=gt_error||hard_breach?1:0;
+    const error_prob=is_error?(0.6+rng()*0.4):(rng()*0.15);
+
+    frames.push({
+      t:Math.round(t*100)/100,
+      work_angle:  Math.round(work_angle*10)/10,
+      travel_speed:Math.round(travel_speed*10)/10,
+      arc_length:  Math.round(arc_length*10)/10,
+      tremor:      Math.round(tremor*1000)/1000,
+      voltage:     Math.round(voltage*10)/10,
+      is_error, error_prob:Math.round(error_prob*100)/100,
+    });
+  }
+  return {frames, seed};
+}
+
+// ── Coaching rules ────────────────────────────────────────────────────────────
+const TIERS={
+  work_angle:  {ideal:[85,95],  hard:[70,110], label:'Work angle'},
+  travel_speed:{ideal:[5,12],   hard:[2,15],   label:'Travel speed'},
+  arc_length:  {ideal:[4,8],    hard:[3,10],   label:'Arc length'},
+  tremor:      {ideal:[0,0.06], hard:[0,0.10], label:'Torch tremor'},
+  voltage:     {ideal:[20,24],  hard:[19,25],  label:'Voltage'},
+};
+const ALL_RULES=[
+  ['arc_length',   v=>v>10,          'Move torch closer — arc too long',        'err'],
+  ['arc_length',   v=>v<3,           'Too close — stubbing risk',                'err'],
+  ['work_angle',   v=>v<70||v>110,   'Fix work angle — aim for 90°',            'err'],
+  ['travel_speed', v=>v>15,          'Slow down — speed too fast',              'err'],
+  ['travel_speed', v=>v<2,           'Speed up — travel rate too slow',         'err'],
+  ['tremor',       v=>v>0.10,        'Steady hand — reduce torch shake',        'err'],
+  ['voltage',      v=>v<19||v>25,    'Check voltage — outside WPS range',       'err'],
+  ['arc_length',   v=>v>8&&v<=10,    'Arc slightly long — move closer',         'warn'],
+  ['arc_length',   v=>v<4&&v>=3,     'Arc slightly short — ease back',          'warn'],
+  ['work_angle',   v=>(v<85&&v>=70)||(v>95&&v<=110),'Angle drifting — re-centre','warn'],
+  ['travel_speed', v=>v>12&&v<=15,   'Speed slightly fast — ease off',          'warn'],
+  ['travel_speed', v=>v<5&&v>=2,     'Speed slightly slow — pick up pace',      'warn'],
+  ['tremor',       v=>v>0.06&&v<=0.10,'Hand not fully steady — relax grip',     'warn'],
+  ['voltage',      v=>(v<20&&v>=19)||(v>24&&v<=25),'Voltage slightly off',      'warn'],
+];
+
+function getAllBreaches(f){
+  const vals={work_angle:f.work_angle,travel_speed:f.travel_speed,
+              arc_length:f.arc_length,tremor:f.tremor,voltage:f.voltage};
+  const seen=new Set(); const results=[];
+  for(const [feat,cond,msg,sev] of ALL_RULES){
+    const key=feat+sev;
+    if(!seen.has(key)&&cond(vals[feat])){
+      if(sev==='warn'&&seen.has(feat+'err'))continue;
+      results.push({feat,msg,sev,label:TIERS[feat].label});
+      seen.add(key);
+    }
+  }
+  return results;
+}
+
+const METRIC_IDS={work_angle:'m-angle',travel_speed:'m-speed',
+  arc_length:'m-arc',tremor:'m-tremor',voltage:'m-voltage'};
+
+function setMetrics(f,breaches){
+  const byFeat={};
+  for(const b of breaches) byFeat[b.feat]=b.sev;
+  const primaryFeat  =breaches.length>0?breaches[0].feat:'';
+  const secondaryFeat=breaches.length>1?breaches[1].feat:'';
+  for(const [feat,id] of Object.entries(METRIC_IDS)){
+    const val=f[feat];
+    const {ideal}=TIERS[feat];
+    const sev=byFeat[feat]; // undefined if not breached
+    let cls='metric ';
+    if(feat===primaryFeat && sev)        cls+='primary-'+sev;
+    else if(feat===secondaryFeat && sev) cls+='secondary-'+sev;
+    else if(sev==='err')                 cls+='error';
+    else if(sev==='warn')                cls+='warn';
+    else if(val>=ideal[0]&&val<=ideal[1])cls+='good';
+    else                                 cls+='neutral'; // within hard but outside ideal — no rule triggered
+    document.getElementById(id).className=cls;
+  }
+}
+
+function setCoach(breaches){
+  const box  =document.getElementById('coach-box');
+  const icon =document.getElementById('coach-icon');
+  const title=document.getElementById('coach-title');
+  const badge=document.getElementById('issue-badge');
+  const list =document.getElementById('issue-list');
+  const errors=breaches.filter(b=>b.sev==='err');
+  const total =breaches.length;
+  if(total===0){
+    box.className='coach-box ok'; icon.className='coach-icon ok'; icon.textContent='✓';
+    title.className='coach-title ok'; title.textContent='Good technique — keep it up';
+    badge.textContent=''; badge.className='issue-badge ok'; list.innerHTML=''; return;
+  }
+  const hasErr=errors.length>0;
+  box.className ='coach-box '+(hasErr?'has-errors':'has-warns');
+  icon.className ='coach-icon '+(hasErr?'err':'warn'); icon.textContent='!';
+  title.className='coach-title '+(hasErr?'err':'warn');
+  title.textContent=breaches[0].msg;
+  badge.className='issue-badge '+(hasErr?'err':'warn');
+  badge.textContent=(hasErr?errors.length+' error'+(errors.length>1?'s':''):'')
+    +(hasErr&&breaches.length>errors.length?' + ':'')
+    +(breaches.length>errors.length?(breaches.length-errors.length)+' warning'+(breaches.length-errors.length>1?'s':''):'');
+  list.innerHTML='';
+  breaches.forEach((b,i)=>{
+    if(i===0)return;
+    const item=document.createElement('div');
+    item.className='issue-item '+b.sev;
+    item.innerHTML='<div class="issue-rank '+b.sev+'">'+(i+1)+'</div>'+
+      '<div class="issue-metric">'+b.label+'</div>'+
+      '<div class="issue-msg">'+b.msg+'</div>';
+    list.appendChild(item);
+  });
+}
+
+// ── Charts ────────────────────────────────────────────────────────────────────
+const MAX_PTS=120;
+function makeChart(id,color,ymin,ymax){
+  return new Chart(document.getElementById(id).getContext('2d'),{
+    type:'line',
+    data:{labels:[],datasets:[
+      {data:[],borderColor:color,borderWidth:1.5,pointRadius:0,tension:0.3,fill:false},
+      {data:[],borderColor:'#1d9e75',borderWidth:1,borderDash:[4,3],pointRadius:0,fill:false},
+      {data:[],borderColor:'#1d9e75',borderWidth:1,borderDash:[4,3],pointRadius:0,fill:false},
+    ]},
+    options:{animation:false,responsive:true,maintainAspectRatio:true,
+      plugins:{legend:{display:false}},
+      scales:{x:{display:false},y:{min:ymin,max:ymax,
+        grid:{color:'#252840'},ticks:{color:'#555',font:{size:10}}}}}
+  });
+}
+const charts={
+  angle:makeChart('chartAngle','#378add',60,125),
+  speed:makeChart('chartSpeed','#ef9f27',-2,22),
+  arc:  makeChart('chartArc',  '#a78bfa',0,16),
+  error:makeChart('chartError','#e24b4a',0,1),
+};
+function pushChart(ch,t,val,rMin,rMax){
+  const dd=ch.data;
+  dd.labels.push(t);
+  dd.datasets[0].data.push(val);
+  dd.datasets[1].data.push(rMin);
+  dd.datasets[2].data.push(rMax);
+  if(dd.labels.length>MAX_PTS){dd.labels.shift();dd.datasets.forEach(ds=>ds.data.shift());}
+  ch.update('none');
+}
+function resetCharts(){
+  Object.values(charts).forEach(c=>{
+    c.data.labels=[];c.data.datasets.forEach(ds=>ds.data=[]);c.update('none');
+  });
+}
+
+// ── Playback ──────────────────────────────────────────────────────────────────
+let frames=[],idx=0,playing=false,timer=null,speed=3;
+let goodFrames=0,totalFrames=0,lastCoachT=-99,lastPrimaryMsg='';
+const COOLDOWN=2.5;
+
+function step(){
+  if(idx>=frames.length){stop();
+    document.getElementById('timeline').textContent+='  — session complete';return;}
+  const f=frames[idx++];
+  totalFrames++; if(!f.is_error)goodFrames++;
+
+  document.getElementById('v-angle').innerHTML  =f.work_angle  +"<span class='metric-unit'>°</span>";
+  document.getElementById('v-speed').innerHTML  =f.travel_speed+"<span class='metric-unit'>mm/s</span>";
+  document.getElementById('v-arc').innerHTML    =f.arc_length  +"<span class='metric-unit'>mm</span>";
+  document.getElementById('v-tremor').innerHTML =f.tremor.toFixed(3);
+  document.getElementById('v-voltage').innerHTML=f.voltage     +"<span class='metric-unit'>V</span>";
+
+  const breaches=getAllBreaches(f);
+  setMetrics(f,breaches);
+
+  // Always re-render breaches every frame — no stale state ever
+  setCoach(breaches);
+  const primaryMsg=breaches.length>0?breaches[0].msg:'';
+  if(primaryMsg!==lastPrimaryMsg||(f.t-lastCoachT)>=COOLDOWN){
+    lastPrimaryMsg=primaryMsg; lastCoachT=f.t;
+  }
+
+  const score=Math.round(goodFrames/totalFrames*100);
+  document.getElementById('v-score').innerHTML=score+"<span class='metric-unit'>%</span>";
+  const bar=document.getElementById('score-bar');
+  bar.style.width=score+'%';
+  bar.className='score-bar'+(score>=80?'':score>=60?' warn':' bad');
+  document.getElementById('m-score').className='metric '+(score>=80?'good':score>=60?'warn':'error');
+
+  const t=f.t.toFixed(1);
+  pushChart(charts.angle,t,f.work_angle,  85,95);
+  pushChart(charts.speed,t,f.travel_speed, 5,12);
+  pushChart(charts.arc,  t,f.arc_length,   4, 8);
+  pushChart(charts.error,t,f.error_prob,   0,0.2);
+
+  document.getElementById('timeline').textContent=
+    't = '+f.t.toFixed(2)+'s  |  good: '+goodFrames+'/'+totalFrames+
+    '  |  active issues: '+breaches.length;
+}
+
+function startSession(skill){
+  stop(); resetCharts();
+  Object.values(METRIC_IDS).forEach(id=>document.getElementById(id).className='metric neutral');
+  goodFrames=0;totalFrames=0;lastPrimaryMsg='';lastCoachT=-99;
+
+  // Generate fresh random session every click
+  const {frames:f,seed}=generateSession(skill,20,100);
+  frames=f; idx=0;
+
+  document.getElementById('session-badge').textContent=skill.charAt(0).toUpperCase()+skill.slice(1);
+  document.getElementById('session-badge').className='badge '+(skill==='expert'?'ok':'err');
+  document.getElementById('seed-label').textContent='seed: '+seed;
+  document.getElementById('v-score').innerHTML="—<span class='metric-unit'>%</span>";
+  document.getElementById('score-bar').style.width='0%';
+  document.getElementById('m-score').className='metric neutral';
+  setCoach([]);
+  document.getElementById('coach-title').textContent='Session generated — press Play';
+  document.getElementById('timeline').textContent=skill+' session ready (seed '+seed+') — press Play';
+  document.getElementById('playbtn').disabled=false;
+}
+
+function togglePlay(){playing?stop():start();}
+function start(){playing=true;document.getElementById('playbtn').textContent='Pause';
+  timer=setInterval(step,Math.max(10,Math.round(50/speed)));}
+function stop(){playing=false;document.getElementById('playbtn').textContent='Play';clearInterval(timer);}
+function setSpeed(v){speed=parseInt(v);if(playing){stop();start();}}
+</script>
+</body>
+</html>
